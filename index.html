@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en-US">
 <head>
+<script src="js/jquery-1.9.1.js"></script>
+<script src="js/jquery-ui-1.10.3.custom.js"></script>
+<link href="css/ui-lightness/jquery-ui-1.10.3.custom.css" rel="stylesheet">
+
 <style>
 
 #controls {
@@ -21,8 +25,24 @@
 .backgroundControls {
 	background-color: #CCDDFF;
 }
+
 </style>
+
+<style type="text/css">
+   /* define a width for the sliders by styling the wrapping div */
+#sizeSliderContainer { 
+	width:150px; 
+	margin-left: 30px;
+}
+</style>
+
 <script>
+function pad(n, width, z) {
+  z = z || '0';
+  n = n + '';
+  return n.length >= width ? n : new Array(width - n.length + 1).join(z) + n;
+}
+
 function drawStarField(canvas,field, img, imgx, imgy,imgw,imgh) {
 	var canvas=document.getElementById(canvas);
 	var ctx=canvas.getContext('2d');
@@ -91,15 +111,25 @@ function drawStarField(canvas,field, img, imgx, imgy,imgw,imgh) {
 function addStar(e,canvas) {
 	var scale = field.width /canvas.width;
     var pos = {
-		x: ((e.pageX - canvas.offsetLeft)-(canvas.width/2))*scale,
-		y: ((e.pageY - canvas.offsetTop)-(canvas.height/2))*scale
+		x: Math.round(((e.pageX - canvas.offsetLeft)-(canvas.width/2))*scale),
+		y: Math.round(((e.pageY - canvas.offsetTop)-(canvas.height/2))*scale)
 	};
 	console.log(pos);
-	var size = document.getElementById('size').value;
+	var size = $( "#sizeSlider" ).slider( "option", "value" );
 	var star={x: pos.x,y:pos.y,s:size};
 	field.stars.push(star);
 	star_selected = field.stars.length - 1;
 	drawStarField('myCanvas',field,imageObj);
+	
+	$.post("star-ajax.php",
+		{
+			id: document.getElementById('constellationName').value.substr(0,3) + pad(star_selected,3,"0"),
+			action: 'add',
+			x: pos.x,
+			y: pos.y,
+			s: size
+		});
+  
 }
 
 function selectStar(e,canvas) {
@@ -119,26 +149,38 @@ function selectStar(e,canvas) {
 	}
 	
 	if (typeof star_selected == 'number') {
-		 document.getElementById('size').value = field.stars[star_selected].s;
+		 $( ".sizeSlider" ).slider( "option", "value", field.stars[star_selected].s );
 	}
 
 	drawStarField('myCanvas',field,imageObj);
 }
 
-function moveStar(e,canvas) {
+function moveStar(e,canvas,dragging) {
 	var scale = field.width / canvas.width;
 	var x = ((e.pageX - canvas.offsetLeft)-(canvas.width/2))*scale;
 	var y = ((e.pageY - canvas.offsetTop)-(canvas.height/2))*scale;
 	field.stars[star_selected].x = x;
 	field.stars[star_selected].y = y;
 	drawStarField('myCanvas',field,imageObj);
+	
+	if (dragging == false) {
+		$.post("star-ajax.php",
+			{
+				id: document.getElementById('constellationName').value.substr(0,3) + star_selected,
+				action: 'update',
+				x: x,
+				y: y
+			});
+	}
+	
 }
 
 function changeSize() {
 //	alert(typeof select);
-	document.getElementById('sizeDisplay').innerHTML = document.getElementById('size').value;
+	var size = $( "#sizeSlider" ).slider( "option", "value" );
+	document.getElementById('sizeDisplay').innerHTML = size;
 	if (typeof star_selected == 'number' ) {
-		field.stars[star_selected].s = document.getElementById('size').value;
+		field.stars[star_selected].s = size;
 		drawStarField('myCanvas',field,imageObj);
 	}
 }
@@ -190,16 +232,25 @@ function changeBackoundImage(e) {
 			<option id="Move Star" value="moveStar">Move Star</option>
 			<option id="Add Link" value="addLink">Add Link</option>			
 		</select>
+		<div id="results"></div>
 		<div class="starControls">
 			<p>Star Controls</p>
-			<label for="size"><input type="range" name="size" id="size"  onChange=changeSize(); min="1" max="50"><span id="sizeDisplay">25</span>
+			Size:</br><span style="float:left;" id="sizeDisplay">10</span><div id="sizeSliderContainer"><div id="sizeSlider" class="narrow-handle"></div></div>
+			</br>
 		</div>
 		<div class="backgroundControls">
 			<label for="displayImage">Display Background Image</label><input type="checkbox" id="displayImage" disabled=true onChange=drawStarField('myCanvas',field,imageObj);></br>
 			<label for="displayUrl">Background URL</label><input type="text" id="displayUrl" onKeyup=changeBackoundImage(); name="displayUrl">
 		</div>
 	</div>
-
+<script type="text/javascript">
+   $(document).ready(function(){
+      $("#sizeSlider").slider({value: 10, min: 3, max: 40, step: 1 });
+      $(".narrow-handle .ui-slider-handle").css("width","6px");
+   });
+//   $("#sizeSlider").on('slidestop',changeSize);
+   $("#sizeSlider").on('slide',changeSize);
+</script>
 	<script type="text/javascript">
 //		var field={width:600, height:600, 
 //			stars:[{x:-171,y:-191,s:5},{x:-260,y:-107,s:10},{x:-49,y:-63,s:3},{x:-70,y:-23,s:3},{x:-112,y:20,s:12},{x:-9,y:52,s:3},{x:-14,y:97,s:4},{x:-12,y:120,s:3},{x:-43,y:200,s:3},{x:-71,y:208,s:3},{x:92,y:117,s:9},{x:155,y:-115,s:3},{x:146,y:-130,s:3},{x:148,y:-165,s:3},{x:260,y:-125,s:4},{x:-99,y:-161,s:3}],
@@ -259,14 +310,16 @@ function changeBackoundImage(e) {
 		canvas.addEventListener('mouseup', function (e) { 
 			if (document.getElementById('action').value == 'moveStar') {
 				dragging = false;
+				moveStar(e,canvas,false);
 			}
 		} , false);
 		canvas.addEventListener('mousemove', function (e) { 
 			if (dragging && document.getElementById('action').value == 'moveStar') {
-				moveStar(e,canvas);
+				moveStar(e,canvas,true);
 			}
 		} , false);
-		
+
+
 	</script>
 	
 
