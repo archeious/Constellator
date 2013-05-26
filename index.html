@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<style>
+
+#controls {
+	width:  300px;
+	border: 1px black solid;
+	float: left;
+}
+
+#constellationName {
+	width: 90%;
+	margin-left: 5px;
+}
+
+.starControls {
+	background-color: #99FFAA;
+}
+
+.backgroundControls {
+	background-color: #CCDDFF;
+}
+</style>
+<script>
+function drawStarField(canvas,field, img, imgx, imgy,imgw,imgh) {
+	var canvas=document.getElementById(canvas);
+	var ctx=canvas.getContext('2d');
+	var width = canvas.width;
+	var height = canvas.height;
+	var midx = width / 2;
+	var midy = height / 2;
+	var aspect = width / height;
+	var scale = 1.0;
+	
+	if (aspect > (field.width/field.height)) {
+		scale = height / field.height;
+	} else {
+		scale = width / field.width;
+	}
+	
+	if (typeof img == 'undefined' || document.getElementById('displayImage').checked == false) {
+		var lingrad = ctx.createLinearGradient(0,0,0,height);
+		lingrad.addColorStop(0, '#000000');
+		lingrad.addColorStop(1, '#000066');
+		ctx.fillStyle = lingrad;
+		ctx.fillRect(0,0,width,height);
+	} else {
+		imgx = typeof imgx !== 'undefined' ? imgx : 0;
+		imgy = typeof imgy !== 'undefined' ? imgy : 0;
+		imgw = typeof imgw !== 'undefined' ? imgw : img.width - imgx;
+		imgh = typeof imgh !== 'undefined' ? imgh : img.height - imgy;
+		ctx.drawImage(img, imgx,imgy,imgw,imgh,0,0,width,height);
+	}	
+		
+	var stars = field.stars;
+	var links = field.links;
+
+	for (var i = 0; i < links.length; i++) {
+		ctx.beginPath();
+		var x1 = midx + stars[links[i].i].x * scale
+		var y1 = midy + stars[links[i].i].y * scale
+		var x2 = midx + stars[links[i].o].x * scale
+		var y2 = midy + stars[links[i].o].y * scale
+		ctx.moveTo(x1, y1);
+		ctx.lineTo(x2, y2);
+		ctx.lineWidth = links[i].s * scale;
+		ctx.strokeStyle = '#0033AA';
+		ctx.stroke();
+	}
+
+	for (var i = 0; i < stars.length; i++) {
+		var x = stars[i].x * scale;
+		var y = stars[i].y * scale;
+		var size = stars[i].s * scale;
+		ctx.beginPath();
+		ctx.arc(midx+x, midy+y, size, 0, 2 * Math.PI, false);
+		ctx.fillStyle = 'yellow';
+		ctx.fill();
+		if (typeof star_selected == 'number' && star_selected == i) {
+			ctx.lineWidth = 3;
+			ctx.strokeStyle = '#FF3300';
+		} else {
+			ctx.lineWidth = 3;
+			ctx.strokeStyle = 'black';
+		}
+		ctx.stroke();
+	}
+}
+
+function addStar(e,canvas) {
+	var scale = field.width /canvas.width;
+    var pos = {
+		x: ((e.pageX - canvas.offsetLeft)-(canvas.width/2))*scale,
+		y: ((e.pageY - canvas.offsetTop)-(canvas.height/2))*scale
+	};
+	console.log(pos);
+	var size = document.getElementById('size').value;
+	var star={x: pos.x,y:pos.y,s:size};
+	field.stars.push(star);
+	star_selected = field.stars.length - 1;
+	drawStarField('myCanvas',field,imageObj);
+}
+
+function selectStar(e,canvas) {
+	var scale = field.width / canvas.width;
+	var x = ((e.pageX - canvas.offsetLeft)-(canvas.width/2))*scale;
+	var y = ((e.pageY - canvas.offsetTop)-(canvas.height/2))*scale;
+	
+	var stars = field.stars;
+	star_selected = null;
+	for (var i = 0; i < stars.length; i++) {
+		var star = stars[i];
+		var size = parseFloat(star.s);
+		if (x > (star.x - size) && x < (star.x + size) &&
+			y > (star.y - size) && y < (star.y + size)) {
+			star_selected = i;
+		}
+	}
+	
+	if (typeof star_selected == 'number') {
+		 document.getElementById('size').value = field.stars[star_selected].s;
+	}
+
+	drawStarField('myCanvas',field,imageObj);
+}
+
+function moveStar(e,canvas) {
+	var scale = field.width / canvas.width;
+	var x = ((e.pageX - canvas.offsetLeft)-(canvas.width/2))*scale;
+	var y = ((e.pageY - canvas.offsetTop)-(canvas.height/2))*scale;
+	field.stars[star_selected].x = x;
+	field.stars[star_selected].y = y;
+	drawStarField('myCanvas',field,imageObj);
+}
+
+function changeSize() {
+//	alert(typeof select);
+	document.getElementById('sizeDisplay').innerHTML = document.getElementById('size').value;
+	if (typeof star_selected == 'number' ) {
+		field.stars[star_selected].s = document.getElementById('size').value;
+		drawStarField('myCanvas',field,imageObj);
+	}
+}
+
+function addLink(star1, star2, canvas) {
+	if (star1 > star2) {
+		var temp = star1;
+		star1 = star2;
+		star2 =temp;
+	}
+	var found = false;
+	for (var i=0; i < field.links.length; i++) {
+		if (field.links[i].i == star1 && field.links[i].o == star2) {
+			found = true;
+			break;
+		}
+	}
+	if (!found) {
+		field.links.push({i:star1, o:star2, s:3});
+		drawStarField('myCanvas',field,imageObj);
+	} else {
+		alert("Link already exists");
+	}
+}
+
+function changeBackoundImage(e) {
+//	imageObj.src = '/img/constellations/orion.png';
+	imageObj.src = document.getElementById('displayUrl').value;
+	if (document.getElementById('displayUrl').value != "") {
+		document.getElementById('displayImage').disabled = false;
+	} else  {
+		document.getElementById('displayImage').disabled = true;
+	}
+}
+</script>
+
+<head>
+
+<body>
+	<h1>Constellator</h1>
+
+	<canvas id="myCanvas" width="605" height="605" style="border: 1px solid black";></canvas>
+	<div class="controls" id="controls">
+		<label for="constellationName">Name</label><input type="text" name="constellationName" id="constellationName" value="Orion"></br>
+		<label for="action">Action</label>
+		<select id="action">
+			<option id="Add Star" value="addStar">Add Star</option>
+			<option id="Select Star" value="selectStar">Select Star</option>
+			<option id="Move Star" value="moveStar">Move Star</option>
+			<option id="Add Link" value="addLink">Add Link</option>			
+		</select>
+		<div class="starControls">
+			<p>Star Controls</p>
+			<label for="size"><input type="range" name="size" id="size"  onChange=changeSize(); min="1" max="50"><span id="sizeDisplay">25</span>
+		</div>
+		<div class="backgroundControls">
+			<label for="displayImage">Display Background Image</label><input type="checkbox" id="displayImage" disabled=true onChange=drawStarField('myCanvas',field,imageObj);></br>
+			<label for="displayUrl">Background URL</label><input type="text" id="displayUrl" onKeyup=changeBackoundImage(); name="displayUrl">
+		</div>
+	</div>
+
+	<script type="text/javascript">
+//		var field={width:600, height:600, 
+//			stars:[{x:-171,y:-191,s:5},{x:-260,y:-107,s:10},{x:-49,y:-63,s:3},{x:-70,y:-23,s:3},{x:-112,y:20,s:12},{x:-9,y:52,s:3},{x:-14,y:97,s:4},{x:-12,y:120,s:3},{x:-43,y:200,s:3},{x:-71,y:208,s:3},{x:92,y:117,s:9},{x:155,y:-115,s:3},{x:146,y:-130,s:3},{x:148,y:-165,s:3},{x:260,y:-125,s:4},{x:-99,y:-161,s:3}],
+//			links:[{i:0,o:15,s:2},{i:1,o:4,s:6},{i:2,o:3,s:2},{i:2,o:15,s:2},{i:3,o:4,s:2},{i:4,o:5,s:2},{i:4,o:6,s:6},{i:5,o:6,s:2},{i:5,o:11,s:2},{i:6,o:7,s:2},{i:6,o:10,s:6},{i:7,o:8,s:2},{i:8,o:9,s:2},{i:11,o:12,s:2},{i:11,o:14,s:2},{i:12,o:13,s:2}],
+//			};
+		var field={width: 1000, height:1000,
+			stars:[],
+			links:[]
+		}
+		
+		var star_selected = null;
+			
+		var imageObj = new Image();
+		imageObj.onload = function() {
+			drawStarField('myCanvas',field,imageObj);
+		  };
+		drawStarField('myCanvas',field,imageObj);
+		//imageObj.src = '/img/constellations/orion.png';
+		var canvas=document.getElementById('myCanvas');
+		canvas.addEventListener('click', function (e) { 
+			switch(document.getElementById('action').value)
+			{
+			case 'addStar':
+				addStar(e,canvas); 
+				break;
+			case 'selectStar':
+				selectStar(e,canvas); 
+				break;
+			case 'moveStar':
+				moveStar(e,canvas); 
+				break;
+			case 'addLink':
+				if (typeof star_selected == 'number') {
+					var oldStar = star_selected;
+					selectStar(e,canvas);
+					if (typeof star_selected == 'number') {
+						addLink(oldStar, star_selected, canvas);
+					} else {
+						alert("Please select second star");
+						star_selected = oldStar;
+					}
+				} else {
+					alert("Please select first star");
+				}
+				break;
+			default:
+				alert('Action Not Implemented');
+			}
+		} , false);
+
+		var dragging = false;
+		canvas.addEventListener('mousedown', function (e) { 
+			if (document.getElementById('action').value == 'moveStar') {
+				dragging = true;
+			}
+		} , false);
+		canvas.addEventListener('mouseup', function (e) { 
+			if (document.getElementById('action').value == 'moveStar') {
+				dragging = false;
+			}
+		} , false);
+		canvas.addEventListener('mousemove', function (e) { 
+			if (dragging && document.getElementById('action').value == 'moveStar') {
+				moveStar(e,canvas);
+			}
+		} , false);
+		
+	</script>
+	
+
+</body>
+
+</html>
